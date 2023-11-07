@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "numcom-project"
+version = "0.1.0"
+description = "This is my numcom project :)"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pygame = "^2.5.2"
+matplotlib = "^3.8.1"
+numba = "^0.58.1"
+opencv-python = "^4.8.1.78"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
