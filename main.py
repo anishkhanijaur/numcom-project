@@ -77,8 +77,10 @@ def line_func(x):
 
 def switch_point_to_graph(point: (int, int)) -> (int, int):
     x, y = point
-    y = HEIGHT/2 - y
-    return (x - GRAPH_WIDTH_LOWER, y)
+    y = (HEIGHT/2 - y)/240
+    x = x - GRAPH_WIDTH_LOWER
+    x = x*24
+    return (x, y)
 
 def switch_to_gui(point: (int, int)) -> (int, int):
     x, y = point
@@ -118,7 +120,8 @@ while running:
         # Update the position of the cursor when the cursor is within the bounds of the graph
         if event.type == pygame.MOUSEMOTION and within_graph_bounds(event.pos):
             font = pygame.font.Font(None, 25)
-            position_text = font.render(f"x: {event.pos[0]}, y: {event.pos[1]}", True, (100, 0, 0))
+            graph_point = switch_point_to_graph(event.pos)
+            position_text = font.render(f"x: {graph_point[0]}, y: {round(graph_point[1],2)}", True, (100, 0, 0))
         # Quit the game
         if event.type == pygame.QUIT:
             running = False
@@ -156,7 +159,7 @@ while running:
                 curve_points = [line_start, line_end]
             # Play audio when P is pressed
             elif event.key == pygame.K_p:
-                audio.audio_from_function(line_func)
+                audio.audio_from_function(line_func,  GRAPH_WIDTH_UPPER-GRAPH_WIDTH_LOWER)
         elif event.type == pygame.VIDEORESIZE:
             width, height = event.size
             if width < WIDTH:
@@ -174,7 +177,7 @@ while running:
     # Axes
     for x in range(GRAPH_WIDTH_LOWER, GRAPH_WIDTH_UPPER, GRID_SPACING):
         font = pygame.font.Font(None, 14)
-        x_text = font.render(f"{x - GRAPH_WIDTH_LOWER}", True, (0, 0, 0))
+        x_text = font.render(f"{round(switch_point_to_graph((x, line_start[1]))[0]/1000, 1)}", True, (0, 0, 0))
         screen.blit(x_text, (x + 1, line_start[1] + 5))
         pygame.draw.line(screen, AXIS_COLOR, (x, line_start[1]), (x, line_start[1] - 10), 3)
     if debug_mode:
@@ -184,9 +187,9 @@ while running:
             screen.blit(y_text, (line_start[0] - 20, y + 1))
             pygame.draw.line(screen, AXIS_COLOR, (line_start[0], y), (line_start[0] + 10, y), 3)
     else:
-        for y in range(GRAPH_HEIGHT_LOWER, GRAPH_HEIGHT_UPPER, GRID_SPACING):
+        for y in range(GRAPH_HEIGHT_LOWER, GRAPH_HEIGHT_UPPER+GRID_SPACING, GRID_SPACING):
             font = pygame.font.Font(None, 14)
-            y_text = font.render(f"{switch_point_to_graph((line_start[0], y))[1]}", True, (0, 0, 0))
+            y_text = font.render(f"{round(switch_point_to_graph((line_start[0], y))[1], 2)}", True, (0, 0, 0))
             screen.blit(y_text, (line_start[0] - 20, y + 1))
             pygame.draw.line(screen, AXIS_COLOR, (line_start[0], y), (line_start[0] + 10, y), 3)
 
