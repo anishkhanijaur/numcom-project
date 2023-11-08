@@ -3,6 +3,7 @@ import sys
 import math
 import lagrange
 import scipy
+import audio
 
 '''
     TODO: . Add the functionality to limit the number of constants in the fft approximation.
@@ -11,6 +12,7 @@ import scipy
           . H to show the help menu
           . Scale graph with button to decide
           . Hermite curve
+          . Input whitenoise to produce sound
 '''
 
 # Initialize Pygame
@@ -46,6 +48,7 @@ interpolation_methods = 2
 # UI properties
 ui_box = pygame.Rect(10, 10, 150, 40)
 debug_box = pygame.Rect(10, 70, 150, 40)
+scale_box = pygame.Rect(10, 130, 150, 40)
 font = pygame.font.Font(None, 30)
 curve_text = font.render("Curve", True, (0, 0, 0))
 lagrange_text = font.render("Lagrange", True, (0, 0, 0))
@@ -53,10 +56,15 @@ spline_text = font.render("Spline", True, (0, 0, 0))
 line_text = font.render("Line", True, (0, 0, 0))
 debug_text = font.render("Debug", True, (0, 0, 0))
 debugging_text = font.render("Debugging", True, (0, 0, 0))
+scale_text = font.render("Scale", True, (0, 0, 0))
+scaling_text = font.render("Scaling", True, (0, 0, 0))
+debug_mode = False
+change_curve = False
+scale_mode = False
 
 
-# Returns the y value of the line at the cursor's x position
-def line_func(x: int) -> int:
+# Returns the y value of the line at the x position
+def line_func(x):
     for index in range(len(line_points) - 1):
         if line_points[index][0] < x < line_points[index + 1][0]:
             x1, y1 = line_points[index]
@@ -65,8 +73,7 @@ def line_func(x: int) -> int:
             m = (y2 - y1) / (x2 - x1)
             c = y2 - m * x2
             return m * x + c
-    print("The point does not exist in the line")
-    return 0  # This would be rather unfortunate
+    return 0
 
 def switch_point_to_graph(point: (int, int)) -> (int, int):
     x, y = point
@@ -104,8 +111,6 @@ position_text = font.render("x: Please move cursor into the graph,"
 
 # Main game loop
 running = True
-debug_mode = False
-change_curve = False
 while running:
     change_curve = False
     screen.fill((255, 255, 255))  # Background color
@@ -127,6 +132,8 @@ while running:
                     change_curve = True
                 elif debug_box.collidepoint(event.pos):
                     debug_mode = not debug_mode
+                elif scale_box.collidepoint(event.pos):
+                    scale_mode = not scale_mode
             if is_moving_line:
                 # Lazy to convert the line points into a hashmap for O(1)
                 x_value_in_line = False
@@ -147,6 +154,9 @@ while running:
             if event.key == pygame.K_BACKSPACE:
                 line_points = [line_start, line_end]
                 curve_points = [line_start, line_end]
+            # Play audio when P is pressed
+            elif event.key == pygame.K_p:
+                audio.audio_from_function(line_func)
         elif event.type == pygame.VIDEORESIZE:
             width, height = event.size
             if width < WIDTH:
@@ -188,15 +198,43 @@ while running:
             lg_func = lagrange.build_lagrange([graph_points[index][0] for index in range(len(graph_points))],
                                               [graph_points[index][1] for index in range(len(graph_points))])
             curve_points = [switch_to_gui((x, int(lg_func(x)))) for x in range(graph_points[0][0], graph_points[-1][0])]
-        pygame.draw.aalines(screen, LINE_COLOR, False, curve_points, LINE_THICKNESS)
-    elif draw_curve == 2 or change_curve:
+        # Scale mode
+        if scale_mode:
+            # scale = GRAPH_HEIGHT_UPPER/max(curve_points, key=lambda coord: abs(coord[1]))[1]
+            # new_curve_points = [(x, y*scale) for (x, y) in curve_points]
+            # pygame.draw.aalines(screen, LINE_COLOR, False, new_curve_points, LINE_THICKNESS)
+            max_val = max(curve_points, key=lambda coord: coord[1])[1]
+            min_val = min(curve_points, key=lambda coord: coord[1])[1]
+            scale = 1
+            half_height = (GRAPH_HEIGHT_UPPER-GRAPH_HEIGHT_LOWER)/2 + GRAPH_HEIGHT_LOWER
+            if max_val-GRAPH_HEIGHT_UPPER > 0:
+                scale = (max_val - half_height)/half_height
+            elif GRAPH_HEIGHT_LOWER-min_val > 0:
+                scale = (half_height-min_val)/half_height
+            new_curve_points = [(x, GRAPH_HEIGHT_LOWER+switch_point_to_graph((switch_point_to_graph((x, y / 10))))[1]) for (x, y) in curve_points]
+            pygame.draw.aalines(screen, LINE_COLOR, False, new_curve_points, LINE_THICKNESS)
+        else:
+            pygame.draw.aalines(screen, LINE_COLOR, False, curve_points, LINE_THICKNESS)
+    elif draw_curve == 2:
         # Spline
-        if is_moving_line:
+        if is_moving_line or change_curve:
             graph_points = [switch_point_to_graph(point) for point in line_points]
             cs_func = scipy.interpolate.CubicSpline([graph_points[index][0] for index in range(len(graph_points))],
                                               [graph_points[index][1] for index in range(len(graph_points))])
             curve_points = [switch_to_gui((x, int(cs_func(x)))) for x in range(graph_points[0][0], graph_points[-1][0])]
-        pygame.draw.aalines(screen, LINE_COLOR, False, curve_points, LINE_THICKNESS)
+        # Scale mode
+        if scale_mode:
+            max_val = max(curve_points, key=lambda coord: coord[1])[1]
+            min_val = min(curve_points, key=lambda coord: coord[1])[1]
+            scale = 0
+            if abs(max_val) >= abs(min_val):
+                scale = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / abs(max_val)
+            else:
+                scale = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / abs(min_val)
+            new_curve_points = [(x, y * scale) for (x, y) in curve_points]
+            pygame.draw.aalines(screen, LINE_COLOR, False, new_curve_points, LINE_THICKNESS)
+        else:
+            pygame.draw.aalines(screen, LINE_COLOR, False, curve_points, LINE_THICKNESS)
     else:
         # Draw the line
         for index in range(len(line_points) - 1):
@@ -221,6 +259,13 @@ while running:
         screen.blit(debugging_text, (20, 80))
     else:
         screen.blit(debug_text, (20, 80))
+
+    # Draw the Scale box
+    pygame.draw.rect(screen, UI_BOX_COLOR, scale_box)
+    if scale_mode:
+        screen.blit(scaling_text, (20, 140))
+    else:
+        screen.blit(scale_text, (20, 140))
 
     # Render the cursor position
     screen.blit(position_text, (GRAPH_WIDTH_LOWER, HEIGHT - 40))
