@@ -3,7 +3,7 @@ import pygame
 import fourier
 import sys
 
-def audio_from_function(my_function, graph_width):
+def audio_from_function(func, graph_width):
     '''
     # Define the mathematical function you want to replicate as a Python function
     # def my_function(x):
@@ -50,7 +50,11 @@ def audio_from_function(my_function, graph_width):
     time_arr = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
 
     # Calculate the function's output for each time point
-    output = np.array([my_function(2 * np.pi * t * 280) for t in time_arr])
+    graph_points = fourier.fourier_approximation
+
+    np.linspace(0, 2, num_samples)
+
+    output = np.array([func(2 * np.pi * t * 280) for t in time_arr])
     output = np.repeat(output.reshape(num_samples, 1), 2, axis=1)
     print(output[20000:20020])
 
@@ -61,7 +65,7 @@ def audio_from_function(my_function, graph_width):
 
     # Calculate the function's output from one end to the other
     time_arr = np.linspace(0, graph_width, int(sample_rate * duration), endpoint=False)
-    output = np.array([my_function(t) for t in time_arr])
+    output = np.array([func(t) for t in time_arr])
 
     # Normalize the output to be in the range [-1, 1]
     # max_value = np.max(np.abs(output))
