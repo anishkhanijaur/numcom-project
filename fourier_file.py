@@ -78,20 +78,22 @@ def fourier_approximation(func, x_values, num_terms):
 
     return fourier_series
 
+"""
 # Example usage:
 # Define a function to approximate
 def original_function(x):
     return x**3+x**2-x
 
-# # Define x values
-# x_values = np.linspace(0, 2, 1000)
-#
-# # Create Fourier approximation function
-# num_terms = 101
-# approximation = fourier_approximation(original_function, x_values, num_terms)
-#
-# # Plot the original function and its Fourier approximation
-# plt.plot(x_values, original_function(x_values), label='Original Function')
-# plt.plot(x_values, approximation(x_values), label=f'Fourier Approximation (Terms={num_terms})')
-# plt.legend()
-# plt.show()
+# Define x values
+x_values = np.linspace(0, 2, 1000)
+
+# Create Fourier approximation function
+num_terms = 101
+approximation = fourier_approximation(original_function, x_values, num_terms)
+
+# Plot the original function and its Fourier approximation
+plt.plot(x_values, original_function(x_values), label='Original Function')
+plt.plot(x_values, approximation(x_values), label=f'Fourier Approximation (Terms={num_terms})')
+plt.legend()
+plt.show()
+"""

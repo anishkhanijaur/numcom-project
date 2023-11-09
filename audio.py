@@ -1,9 +1,11 @@
+import time
+
 import numpy as np
 import pygame
-import fourier
+import fourier_file
 import sys
 
-def audio_from_function(func, graph_width):
+def audio_from_function(func, graph_width, fourier=False, n_terms=0):
     '''
     # Define the mathematical function you want to replicate as a Python function
     # def my_function(x):
@@ -39,48 +41,31 @@ def audio_from_function(func, graph_width):
     '''
 
     # Parameters for sound generation
-    bits = 16
-    sample_rate = 44100  # The number of samples per second (standard for audio)
-    duration = 1  # Duration of the sound in seconds
+    sample_rate = 20000 #44100  # The number of samples per second (standard for audio)
+    duration = 2  # Duration of the sound in seconds
     num_samples = int(sample_rate * duration)
-    amplitude = 0.5  # Amplitude of the sound
-
-    # Create a time array
-    # TODO: Convert this so that the time_arr can be used on the graph
-    time_arr = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+    one_sec = 1000
 
     # Calculate the function's output for each time point
-    graph_points = fourier.fourier_approximation
+    # TODO: Implement this to be able to be togglable
+    # fourier_func = fourier_file.fourier_approximation(func, time_arr, 50)
 
-    np.linspace(0, 2, num_samples)
+    # Populate the sound buffer
+    buf = np.zeros((num_samples, 2))
+    if fourier:
+       ...
+    else:
+        for index in range(len(buf)):
+            value = func(index) * 1000_000 # Get the y value at frequency index
+            buf[index][0] = value # left
+            buf[index][1] = value # right
 
-    output = np.array([func(2 * np.pi * t * 280) for t in time_arr])
-    output = np.repeat(output.reshape(num_samples, 1), 2, axis=1)
-    print(output[20000:20020])
-
-    # Initialize the pygame mixer
-    pygame.mixer.pre_init(sample_rate, bits)
-    pygame.mixer.set_num_channels(1)
-    print(f"Pygame mixer init: {pygame.mixer.get_init()}")
-
-    # Calculate the function's output from one end to the other
-    time_arr = np.linspace(0, graph_width, int(sample_rate * duration), endpoint=False)
-    output = np.array([func(t) for t in time_arr])
-
-    # Normalize the output to be in the range [-1, 1]
-    # max_value = np.max(np.abs(output))
-    # if max_value != 0:
-    #     output /= max_value
-
-    # Create the sound buffer
-    sound_buffer = np.zeros((num_samples, 2), dtype=np.int16)
-    for index in range(len(output)):
-        sound_buffer[index][0] = int(round(output[index]))
-        sound_buffer[index][1] = int(round(output[index]))
+    buf = buf.astype(np.int16)
 
     # Play the sound
-    sound = pygame.sndarray.make_sound(sound_buffer)
-    sound.play()
+    sound = pygame.sndarray.make_sound(buf)
+    print(f"length from pg {pygame.mixer.Sound.get_length(sound)}")
+    sound.play(loops=5) #, maxtime=int(duration * one_sec))
 
     # Convert the numpy array to a sound sample
     # TODO: Change to work with the following

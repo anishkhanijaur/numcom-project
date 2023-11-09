@@ -14,10 +14,19 @@ import numpy as np
           . Scale graph with button to decide
           . Hermite curve
           . Input whitenoise to produce sound
+          . https://en.wikipedia.org/wiki/Constrained_optimization
 '''
+
+# Calculate the slopes such that they are continuous. At the end you should be getting a big matrix
 
 # Initialize Pygame
 pygame.init()
+# Initialize the pygame mixer
+bits = -16
+sample_rate = 44100
+pygame.mixer.pre_init(sample_rate, bits)
+pygame.mixer.set_num_channels(1)
+print(f"Pygame mixer init: {pygame.mixer.get_init()}")
 
 # Constants
 WIDTH, HEIGHT = 1280, 720
@@ -166,7 +175,14 @@ while running:
                 curve_points_gui = [line_start, line_end]
             # Play audio when P is pressed
             elif event.key == pygame.K_p:
-                audio.audio_from_function(line_func,  GRAPH_WIDTH_UPPER-GRAPH_WIDTH_LOWER)
+                local_height = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER)/2
+                if draw_curve == 0:
+                    audio.audio_from_function(line_func,  switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
+                                              - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
+                else:
+                    audio.audio_from_function(curve_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
+                                              - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
+
         elif event.type == pygame.VIDEORESIZE:
             width, height = event.size
             if width < WIDTH:
@@ -232,10 +248,13 @@ while running:
             #     scale = (max_val - half_height) / half_height
             # elif GRAPH_HEIGHT_LOWER - min_val > 0:
             #     scale = (half_height - min_val) / half_height
-            ratio = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / (max_val - min_val)
+            ratio = 1
+            if (max_val - min_val) > 0:
+                ratio = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / (max_val - min_val)
             output_line = [
                 (x, GRAPH_HEIGHT_LOWER + ratio * (y - min_val)) for (x, y)
                 in output_line]
+            graph_points = [switch_point_to_graph(point) for point in line_points]
         pygame.draw.aalines(screen, LINE_COLOR, False, output_line, LINE_THICKNESS)
     else:
         # Draw the line
