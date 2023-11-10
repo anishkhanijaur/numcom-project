@@ -45,10 +45,30 @@ GRAPH_WIDTH_LOWER, GRAPH_WIDTH_UPPER = (int(WIDTH / 6), int(5 * WIDTH / 6))
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("Modify Line")
 
-# class button:
-#     def __init__(self, text, y_position, onclick_event):
-#         text = text
-#
+class Button:
+    def __init__(self, texts, y_position):
+        self.texts = []
+        for text in texts:
+            self.texts.append(font.render(text, True, (0, 0, 0)))
+        self.y_position = y_position
+        self.box = pygame.Rect(10, y_position, 150, 40)
+        self.index = 0
+
+    def toggle_text(self):
+        self.index = (draw_curve + 1) % (len(self.texts) + 1)
+
+    def get_state(self):
+        return self.index
+
+    def get_text(self):
+        return self.texts[self.index]
+
+    def collision(self, position):
+        return self.box.collidepoint(position)
+
+    def draw_box(self):
+        pygame.draw.rect(screen, UI_BOX_COLOR, self.box)
+        screen.blit(self.get_text(), (20, self.y_position + 10))
 
 # Useful functions
 def switch_point_to_graph(point: (int, int)) -> (int, int):
@@ -73,11 +93,6 @@ curve_points_gui = [line_start, line_end]
 graph_points = [switch_point_to_graph(point) for point in line_points]
 curve_func = lagrange.build_lagrange([graph_points[index][0] for index in range(len(graph_points))],
                                      [graph_points[index][1] for index in range(len(graph_points))])
-is_dragging_start = False
-is_dragging_end = False
-is_moving_line = False
-draw_curve = 0
-interpolation_methods = 2
 
 # UI properties
 ui_box = pygame.Rect(10, 10, 150, 40)
@@ -92,12 +107,22 @@ debug_text = font.render("Debug", True, (0, 0, 0))
 debugging_text = font.render("Debugging", True, (0, 0, 0))
 scale_text = font.render("Scale", True, (0, 0, 0))
 scaling_text = font.render("Scaling", True, (0, 0, 0))
+
+# Global States
 debug_mode = False
 change_curve = False
 scale_mode = False
+is_moving_line = False
+draw_curve = 0
+interpolation_methods = 2
+
+# UI Buttons
+curve_button = Button(["Line", "Lagrange", "Spline"], 10)
+debug_button = Button(["Debug", "Debugging"], 70)
+scale_button = Button(["Scale", "Scale"], 130)
+
 
 # Returns the y value of the line at the x position
-# TODO: Maybe make this into GUI vs graph
 def line_func(x):
     for index in range(len(line_points) - 1):
         if line_points[index][0] < x < line_points[index + 1][0]:
@@ -179,8 +204,10 @@ while running:
                 line_points = [line_start, line_end]
                 curve_points = [switch_point_to_graph(line_start), switch_point_to_graph(line_end)]
                 curve_points_gui = [line_start, line_end]
+                pygame.mixer.pause()
             # Play audio when P is pressed
             elif event.key == pygame.K_p:
+                pygame.mixer.unpause()
                 local_height = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER)/2
                 if draw_curve == 0:
                     audio.audio_from_function(line_func,  switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]

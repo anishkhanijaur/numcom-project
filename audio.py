@@ -55,10 +55,13 @@ def audio_from_function(func, graph_width, fourier=False, n_terms=0):
     if fourier:
        ...
     else:
-        for index in range(len(buf)):
+        # for index in range(len(buf)):
+        current_index = 0
+        for index in np.linspace(0, sample_rate, num_samples):
             value = func(index) * 1700_000 # Get the y value at frequency index
-            buf[index][0] = value # left
-            buf[index][1] = value # right
+            buf[current_index][0] = value # left
+            buf[current_index][1] = value # right
+            current_index += 1
 
     buf = buf.astype(np.int16)
 
