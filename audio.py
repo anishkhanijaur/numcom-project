@@ -42,7 +42,7 @@ def audio_from_function(func, graph_width, fourier=False, n_terms=0):
 
     # Parameters for sound generation
     sample_rate = 20000 #44100  # The number of samples per second (standard for audio)
-    duration = 2  # Duration of the sound in seconds
+    duration = 1  # Duration of the sound in seconds
     num_samples = int(sample_rate * duration)
     one_sec = 1000
 
@@ -56,16 +56,19 @@ def audio_from_function(func, graph_width, fourier=False, n_terms=0):
        ...
     else:
         for index in range(len(buf)):
-            value = func(index) * 1000_000 # Get the y value at frequency index
+            value = func(index) * 1700_000 # Get the y value at frequency index
             buf[index][0] = value # left
             buf[index][1] = value # right
 
     buf = buf.astype(np.int16)
 
+
+
     # Play the sound
     sound = pygame.sndarray.make_sound(buf)
     print(f"length from pg {pygame.mixer.Sound.get_length(sound)}")
-    sound.play(loops=5) #, maxtime=int(duration * one_sec))
+    sound.play(loops=-1) #, maxtime=int(duration * one_sec))
+    # If the value of the sound ends up being 0 at certain frequency, just cut it out and copy it till the end
 
     # Convert the numpy array to a sound sample
     # TODO: Change to work with the following

@@ -25,6 +25,7 @@ pygame.init()
 bits = -16
 sample_rate = 44100
 pygame.mixer.pre_init(sample_rate, bits)
+pygame.mixer.init(frequency=int(sample_rate*0.05))
 pygame.mixer.set_num_channels(1)
 print(f"Pygame mixer init: {pygame.mixer.get_init()}")
 
@@ -43,6 +44,11 @@ GRAPH_WIDTH_LOWER, GRAPH_WIDTH_UPPER = (int(WIDTH / 6), int(5 * WIDTH / 6))
 # Screen setup
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("Modify Line")
+
+# class button:
+#     def __init__(self, text, y_position, onclick_event):
+#         text = text
+#
 
 # Useful functions
 def switch_point_to_graph(point: (int, int)) -> (int, int):
