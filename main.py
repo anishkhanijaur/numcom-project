@@ -21,11 +21,12 @@ import numpy as np
 
 # Initialize Pygame
 pygame.init()
+
 # Initialize the pygame mixer
 bits = -16
 sample_rate = 44100
 pygame.mixer.pre_init(sample_rate, bits)
-pygame.mixer.init(frequency=int(sample_rate*0.05))
+pygame.mixer.init(frequency=int(sample_rate * 0.05))
 pygame.mixer.set_num_channels(1)
 print(f"Pygame mixer init: {pygame.mixer.get_init()}")
 
@@ -40,22 +41,25 @@ UI_BOX_COLOR = (200, 200, 200)
 POINT_COLOR = (0, 100, 0)
 GRAPH_HEIGHT_LOWER, GRAPH_HEIGHT_UPPER = (int(HEIGHT / 6), int(5 * HEIGHT / 6))
 GRAPH_WIDTH_LOWER, GRAPH_WIDTH_UPPER = (int(WIDTH / 6), int(5 * WIDTH / 6))
+local_height = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / 2
 
 # Screen setup
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("Modify Line")
 
+
 class Button:
     def __init__(self, texts, y_position):
+        button_font = pygame.font.Font(None, 30)
         self.texts = []
         for text in texts:
-            self.texts.append(font.render(text, True, (0, 0, 0)))
+            self.texts.append(button_font.render(text, True, (0, 0, 0)))
         self.y_position = y_position
         self.box = pygame.Rect(10, y_position, 150, 40)
         self.index = 0
 
     def toggle_text(self):
-        self.index = (draw_curve + 1) % (len(self.texts) + 1)
+        self.index = (self.index + 1) % (len(self.texts))
 
     def get_state(self):
         return self.index
@@ -63,26 +67,33 @@ class Button:
     def get_text(self):
         return self.texts[self.index]
 
-    def collision(self, position):
-        return self.box.collidepoint(position)
+    # If we are colliding with the box then update it
+    def is_colliding(self, position):
+        if self.box.collidepoint(position):
+            self.toggle_text()
+            return True
+        return False
 
-    def draw_box(self):
+    def draw(self):
         pygame.draw.rect(screen, UI_BOX_COLOR, self.box)
         screen.blit(self.get_text(), (20, self.y_position + 10))
+
 
 # Useful functions
 def switch_point_to_graph(point: (int, int)) -> (int, int):
     x, y = point
-    y = (HEIGHT/2 - y)/240
+    y = (HEIGHT / 2 - y) / 240
     x = x - GRAPH_WIDTH_LOWER
-    x = x*24
+    x = x * 24
     return (x, y)
+
 
 def switch_to_gui(point: (int, int)) -> (int, int):
     x, y = point
-    x = (x/24 + GRAPH_WIDTH_LOWER)
-    y = (HEIGHT/2 - y*240)
+    x = (x / 24 + GRAPH_WIDTH_LOWER)
+    y = (HEIGHT / 2 - y * 240)
     return (x, y)
+
 
 # Line properties
 line_start = [GRAPH_WIDTH_LOWER, int(HEIGHT / 2)]
@@ -93,34 +104,6 @@ curve_points_gui = [line_start, line_end]
 graph_points = [switch_point_to_graph(point) for point in line_points]
 curve_func = lagrange.build_lagrange([graph_points[index][0] for index in range(len(graph_points))],
                                      [graph_points[index][1] for index in range(len(graph_points))])
-
-# UI properties
-ui_box = pygame.Rect(10, 10, 150, 40)
-debug_box = pygame.Rect(10, 70, 150, 40)
-scale_box = pygame.Rect(10, 130, 150, 40)
-font = pygame.font.Font(None, 30)
-curve_text = font.render("Curve", True, (0, 0, 0))
-lagrange_text = font.render("Lagrange", True, (0, 0, 0))
-spline_text = font.render("Spline", True, (0, 0, 0))
-line_text = font.render("Line", True, (0, 0, 0))
-debug_text = font.render("Debug", True, (0, 0, 0))
-debugging_text = font.render("Debugging", True, (0, 0, 0))
-scale_text = font.render("Scale", True, (0, 0, 0))
-scaling_text = font.render("Scaling", True, (0, 0, 0))
-
-# Global States
-debug_mode = False
-change_curve = False
-scale_mode = False
-is_moving_line = False
-draw_curve = 0
-interpolation_methods = 2
-
-# UI Buttons
-curve_button = Button(["Line", "Lagrange", "Spline"], 10)
-debug_button = Button(["Debug", "Debugging"], 70)
-scale_button = Button(["Scale", "Scale"], 130)
-
 
 # Returns the y value of the line at the x position
 def line_func(x):
@@ -134,6 +117,19 @@ def line_func(x):
             return m * x + c
     return 0
 
+# Global States
+change_curve = False
+is_moving_line = False
+interpolation_methods = 2
+sound = audio.audio_from_function(line_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
+                                  - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
+
+# UI Buttons
+curve_button = Button(["Line", "Lagrange", "Spline"], 10)
+debug_button = Button(["Debug", "Debugging"], 70)
+scale_button = Button(["Scale", "Scale"], 130)
+
+
 # Checks if the cursor close enough to the line
 def touching_line(position):
     x, y = position
@@ -142,6 +138,7 @@ def touching_line(position):
         return True
     else:
         return False
+
 
 # Returns if the (x, y) value is within the bounds of the graph
 def within_graph_bounds(position):
@@ -153,6 +150,7 @@ def within_graph_bounds(position):
 
 
 # The value for the cursor position
+font = pygame.font.Font(None, 25)
 position_text = font.render("x: Please move cursor into the graph,"
                             " y: Please move cursor into the graph",
                             True, (100, 0, 0))
@@ -167,7 +165,7 @@ while running:
         if event.type == pygame.MOUSEMOTION and within_graph_bounds(event.pos):
             font = pygame.font.Font(None, 25)
             graph_point = switch_point_to_graph(event.pos)
-            position_text = font.render(f"x: {graph_point[0]}, y: {round(graph_point[1],2)}", True, (100, 0, 0))
+            position_text = font.render(f"x: {graph_point[0]}, y: {round(graph_point[1], 2)}", True, (100, 0, 0))
         # Quit the game
         if event.type == pygame.QUIT:
             running = False
@@ -176,13 +174,10 @@ while running:
             print(f"[DEBUG] Mouse button down: {event.pos}")
             if event.button == 1:
                 is_moving_line = True
-                if ui_box.collidepoint(event.pos):
-                    draw_curve = (draw_curve+1) % (interpolation_methods+1)
+                if curve_button.is_colliding(event.pos):
                     change_curve = True
-                elif debug_box.collidepoint(event.pos):
-                    debug_mode = not debug_mode
-                elif scale_box.collidepoint(event.pos):
-                    scale_mode = not scale_mode
+                debug_button.is_colliding(event.pos)  # Check if we are touching the debug_button and update it
+                scale_button.is_colliding(event.pos)  # Check if we are touching the scale_button and update it
             if is_moving_line:
                 # Lazy to convert the line points into a hashmap for O(1)
                 x_value_in_line = False
@@ -194,6 +189,11 @@ while running:
                 if not x_value_in_line and within_graph_bounds(event.pos):
                     line_points.append(event.pos)
                     line_points.sort(key=lambda p: p[0])
+                # Reset the sound
+                sound.stop()
+                sound = audio.audio_from_function(line_func,
+                                                  switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
+                                                  - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
         # Reset is_moving_line when we aren't pressing anything
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
@@ -204,18 +204,21 @@ while running:
                 line_points = [line_start, line_end]
                 curve_points = [switch_point_to_graph(line_start), switch_point_to_graph(line_end)]
                 curve_points_gui = [line_start, line_end]
-                pygame.mixer.pause()
+                curve_func = line_func
+                sound.stop()
+                sound = audio.audio_from_function(line_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
+                                                  - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
             # Play audio when P is pressed
             elif event.key == pygame.K_p:
-                pygame.mixer.unpause()
-                local_height = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER)/2
-                if draw_curve == 0:
-                    audio.audio_from_function(line_func,  switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
-                                              - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
+                if curve_button.get_state() == 0:
+                    sound = audio. \
+                        audio_from_function(line_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
+                                            - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
                 else:
-                    audio.audio_from_function(curve_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
-                                              - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
-
+                    sound = audio. \
+                        audio_from_function(curve_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
+                                            - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
+                sound.play(loops=-1)
         elif event.type == pygame.VIDEORESIZE:
             width, height = event.size
             if width < WIDTH:
@@ -233,37 +236,43 @@ while running:
     # Axes
     for x in range(GRAPH_WIDTH_LOWER, GRAPH_WIDTH_UPPER, GRID_SPACING):
         font = pygame.font.Font(None, 14)
-        x_text = font.render(f"{round(switch_point_to_graph((x, line_start[1]))[0]/1000, 1)}", True, (0, 0, 0))
+        x_text = font.render(f"{round(switch_point_to_graph((x, line_start[1]))[0] / 1000, 1)}", True, (0, 0, 0))
         screen.blit(x_text, (x + 1, line_start[1] + 5))
         pygame.draw.line(screen, AXIS_COLOR, (x, line_start[1]), (x, line_start[1] - 10), 3)
-    if debug_mode:
+    if debug_button.get_state() == 1:
         for y in range(GRAPH_HEIGHT_LOWER, GRAPH_HEIGHT_UPPER, GRID_SPACING):
             font = pygame.font.Font(None, 14)
             y_text = font.render(f"{switch_to_gui(switch_point_to_graph((line_start[0], y)))[1]}", True, (0, 0, 0))
             screen.blit(y_text, (line_start[0] - 20, y + 1))
             pygame.draw.line(screen, AXIS_COLOR, (line_start[0], y), (line_start[0] + 10, y), 3)
     else:
-        for y in range(GRAPH_HEIGHT_LOWER, GRAPH_HEIGHT_UPPER+GRID_SPACING, GRID_SPACING):
+        for y in range(GRAPH_HEIGHT_LOWER, GRAPH_HEIGHT_UPPER + GRID_SPACING, GRID_SPACING):
             font = pygame.font.Font(None, 14)
             y_text = font.render(f"{round(switch_point_to_graph((line_start[0], y))[1], 2)}", True, (0, 0, 0))
             screen.blit(y_text, (line_start[0] - 20, y + 1))
             pygame.draw.line(screen, AXIS_COLOR, (line_start[0], y), (line_start[0] + 10, y), 3)
 
     # Draw the curve
-    if draw_curve > 0:
+    curve_button_state = curve_button.get_state()
+    if curve_button_state > 0:
         # If there's an update to the curve
         if is_moving_line or change_curve:
             graph_points = [switch_point_to_graph(point) for point in line_points]
             # Lagrange
-            if draw_curve == 1:
+            if curve_button_state == 1:
                 curve_func = lagrange.build_lagrange([graph_points[index][0] for index in range(len(graph_points))],
-                                                  [graph_points[index][1] for index in range(len(graph_points))])
+                                                     [graph_points[index][1] for index in range(len(graph_points))])
             # Spline
-            elif draw_curve == 2:
-                curve_func = scipy.interpolate.CubicSpline([graph_points[index][0] for index in range(len(graph_points))],
-                                                  [graph_points[index][1] for index in range(len(graph_points))])
+            elif curve_button_state == 2:
+                curve_func = scipy.interpolate.CubicSpline(
+                    [graph_points[index][0] for index in range(len(graph_points))],
+                    [graph_points[index][1] for index in range(len(graph_points))])
             points = [(switch_point_to_graph((x, 0))[0], curve_func(switch_point_to_graph((x, 0))[0]))
                       for x in np.linspace(GRAPH_WIDTH_LOWER, GRAPH_WIDTH_UPPER, 22000)]
+            # Reset the sound
+            sound.stop()
+            sound = audio.audio_from_function(curve_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
+                                              - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
             # Switch the curve points from graph points to gui points
             curve_points_gui = [switch_to_gui(point) for point in points]
             output_line = curve_points_gui
@@ -272,15 +281,11 @@ while running:
             print(f"Curve points gui len: {len(curve_points_gui)}")
         output_line = curve_points_gui
         # Scale mode
-        if scale_mode:
+        if scale_button.get_state() == 1:
             max_val = max(output_line, key=lambda coord: coord[1])[1]
             min_val = min(output_line, key=lambda coord: coord[1])[1]
             scale = 1
             half_height = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / 2 + GRAPH_HEIGHT_LOWER
-            # if max_val - GRAPH_HEIGHT_UPPER > 0:
-            #     scale = (max_val - half_height) / half_height
-            # elif GRAPH_HEIGHT_LOWER - min_val > 0:
-            #     scale = (half_height - min_val) / half_height
             ratio = 1
             if (max_val - min_val) > 0:
                 ratio = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / (max_val - min_val)
@@ -293,33 +298,14 @@ while running:
         # Draw the line
         for index in range(len(line_points) - 1):
             pygame.draw.aaline(screen, LINE_COLOR, line_points[index], line_points[index + 1], LINE_THICKNESS)
-
     # Draw the points pressed:
     for point in line_points:
         pygame.draw.circle(screen, POINT_COLOR, point, 5)
 
-    # Draw the UI box
-    pygame.draw.rect(screen, UI_BOX_COLOR, ui_box)
-    if draw_curve == 1:
-        screen.blit(lagrange_text, (20, 20))
-    elif draw_curve == 2:
-        screen.blit(spline_text, (20, 20))
-    else:
-        screen.blit(line_text, (20, 20))
-
-    # Draw the Debug box
-    pygame.draw.rect(screen, UI_BOX_COLOR, debug_box)
-    if debug_mode:
-        screen.blit(debugging_text, (20, 80))
-    else:
-        screen.blit(debug_text, (20, 80))
-
-    # Draw the Scale box
-    pygame.draw.rect(screen, UI_BOX_COLOR, scale_box)
-    if scale_mode:
-        screen.blit(scaling_text, (20, 140))
-    else:
-        screen.blit(scale_text, (20, 140))
+    # Draw the UI:
+    curve_button.draw()
+    debug_button.draw()
+    scale_button.draw()
 
     # Render the cursor position
     screen.blit(position_text, (GRAPH_WIDTH_LOWER, HEIGHT - 40))
