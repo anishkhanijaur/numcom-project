@@ -1,19 +1,16 @@
 import pygame
 import sys
-import math
+import fourier_file
 import lagrange
 import scipy
 import audio
 import numpy as np
+import concurrent.futures
 
 '''
-    TODO: . Add the functionality to limit the number of constants in the fft approximation.
-          . Figure out how to compile this code to become like an exe file.
+    TODO: . Figure out how to compile this code to become like an exe file.
           . How to save the produced sound.
           . H to show the help menu
-          . Scale graph with button to decide
-          . Hermite curve
-          . Input whitenoise to produce sound
           . https://en.wikipedia.org/wiki/Constrained_optimization
 '''
 
@@ -33,6 +30,7 @@ print(f"Pygame mixer init: {pygame.mixer.get_init()}")
 # Constants
 WIDTH, HEIGHT = 1280, 720
 LINE_COLOR = (255, 0, 0)  # Red color
+FOURIER_COLOR = (0, 0, 255)  # Blue color
 LINE_THICKNESS = 3
 GRID_COLOR = (100, 100, 100)
 AXIS_COLOR = (0, 0, 100)
@@ -42,6 +40,8 @@ POINT_COLOR = (0, 100, 0)
 GRAPH_HEIGHT_LOWER, GRAPH_HEIGHT_UPPER = (int(HEIGHT / 6), int(5 * HEIGHT / 6))
 GRAPH_WIDTH_LOWER, GRAPH_WIDTH_UPPER = (int(WIDTH / 6), int(5 * WIDTH / 6))
 local_height = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / 2
+SAMPLE_RATE = 20000
+DURATION = 1
 
 # Screen setup
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
@@ -78,6 +78,9 @@ class Button:
         pygame.draw.rect(screen, UI_BOX_COLOR, self.box)
         screen.blit(self.get_text(), (20, self.y_position + 10))
 
+    def reset_state(self):
+        self.index = 0
+
 
 # Useful functions
 def switch_point_to_graph(point: (int, int)) -> (int, int):
@@ -94,6 +97,12 @@ def switch_to_gui(point: (int, int)) -> (int, int):
     y = (HEIGHT / 2 - y * 240)
     return (x, y)
 
+def switch_to_gui_fourier(point: (int, int)) -> (int, int):
+    x, y = point
+    x = (x / 24 + GRAPH_WIDTH_LOWER)
+    y = (HEIGHT / 2 - y * 240)+local_height
+    return (x, y)
+
 
 # Line properties
 line_start = [GRAPH_WIDTH_LOWER, int(HEIGHT / 2)]
@@ -102,8 +111,10 @@ line_points = [line_start, line_end]
 curve_points = [switch_point_to_graph(line_start), switch_point_to_graph(line_end)]
 curve_points_gui = [line_start, line_end]
 graph_points = [switch_point_to_graph(point) for point in line_points]
-curve_func = lagrange.build_lagrange([graph_points[index][0] for index in range(len(graph_points))],
-                                     [graph_points[index][1] for index in range(len(graph_points))])
+curve_func = lagrange.build_lagrange([switch_point_to_graph(line_points[index])[0] for index in range(len(line_points))],
+                                     [switch_point_to_graph(line_points[index])[1] for index in range(len(line_points))])
+graph_fourier_points = []
+fourier_points_gui = []
 
 # Returns the y value of the line at the x position
 def line_func(x):
@@ -120,14 +131,24 @@ def line_func(x):
 # Global States
 change_curve = False
 is_moving_line = False
+play_sound = False
+play_fourier_sound = False
 interpolation_methods = 2
 sound = audio.audio_from_function(line_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
                                   - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
+fourier_sound = sound
+fourier_func = fourier_file.fourier_approximation(line_func, [point[0] for point in line_points], 0)
+
 
 # UI Buttons
-curve_button = Button(["Line", "Lagrange", "Spline"], 10)
-debug_button = Button(["Debug", "Debugging"], 70)
-scale_button = Button(["Scale", "Scale"], 130)
+button_y = 10
+curve_button = Button(["Line", "Lagrange", "Spline"], button_y)
+button_y += 60
+debug_button = Button(["Debug", "Debugging"], button_y)
+button_y += 60
+scale_button = Button(["Scale", "Scaling"], button_y)
+button_y += 60
+fourier_button = Button(["Fourier"] + [str(3*i) for i in range(1,10)], button_y)
 
 
 # Checks if the cursor close enough to the line
@@ -174,10 +195,38 @@ while running:
             print(f"[DEBUG] Mouse button down: {event.pos}")
             if event.button == 1:
                 is_moving_line = True
+                # Check if we are touching the buttons and update their states
                 if curve_button.is_colliding(event.pos):
                     change_curve = True
-                debug_button.is_colliding(event.pos)  # Check if we are touching the debug_button and update it
-                scale_button.is_colliding(event.pos)  # Check if we are touching the scale_button and update it
+                debug_button.is_colliding(event.pos)
+                scale_button.is_colliding(event.pos)
+                fourier_state = fourier_button.get_state()
+                fourier_button.is_colliding(event.pos)
+                if fourier_button.get_state() > 0 and fourier_button.get_state() != fourier_state:
+                    # Update fourier
+                    print("Setting up fourier function")
+                    if curve_button.get_state() > 0:
+                        fourier_func = fourier_file.fourier_approximation(
+                            curve_func,
+                            np.linspace(0, switch_point_to_graph((GRAPH_WIDTH_UPPER, 0))[0], 10),
+                            # [switch_point_to_graph(point)[0] for point in line_points],
+                            fourier_button.get_state()*3
+                        )
+                    else:
+                        all_points = line_points + [(point, 0) for point in np.linspace(GRAPH_WIDTH_LOWER, GRAPH_HEIGHT_UPPER, len(line_points)*10)]
+                        points = [point[0] for point in all_points]
+                        points.sort(reverse=False)
+                        print(f"Points for fourier {points}")
+                        fourier_func = fourier_file.fourier_approximation(
+                            line_func,
+                            points,
+                            fourier_button.get_state()*3
+                        )
+                    print("Done getting fourier")
+                elif fourier_button.get_state() == 0:
+                    # Clear fourier
+                    def waste_func(input_value): return input_value
+                    fourier_func = waste_func
             if is_moving_line:
                 # Lazy to convert the line points into a hashmap for O(1)
                 x_value_in_line = False
@@ -201,15 +250,25 @@ while running:
         elif event.type == pygame.KEYDOWN:
             # Reset all points when backspace pressed
             if event.key == pygame.K_BACKSPACE:
+                print("[DEBUG] Backspace")
                 line_points = [line_start, line_end]
                 curve_points = [switch_point_to_graph(line_start), switch_point_to_graph(line_end)]
                 curve_points_gui = [line_start, line_end]
                 curve_func = line_func
+                fourier_button.reset_state()
                 sound.stop()
+                print("[DEBUG] STOP")
+                play_sound = False
+                play_fourier_sound = False
+                fourier_sound = sound
                 sound = audio.audio_from_function(line_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
                                                   - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
             # Play audio when P is pressed
             elif event.key == pygame.K_p:
+                print("[DEBUG] P")
+                play_sound = not play_sound
+                if not play_sound:
+                    sound.stop()
                 if curve_button.get_state() == 0:
                     sound = audio. \
                         audio_from_function(line_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
@@ -218,7 +277,16 @@ while running:
                     sound = audio. \
                         audio_from_function(curve_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
                                             - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
-                sound.play(loops=-1)
+                if play_sound:
+                    print("[DEBUG] PLAY")
+                    sound.play(loops=-1)
+            elif event.key == pygame.K_f:
+                play_fourier_sound = not play_fourier_sound
+                if not play_fourier_sound:
+                    fourier_sound.stop()
+                if play_fourier_sound:
+                    print("[DEBUG] PLAY")
+                    fourier_sound.play(loops=-1)
         elif event.type == pygame.VIDEORESIZE:
             width, height = event.size
             if width < WIDTH:
@@ -268,7 +336,7 @@ while running:
                     [graph_points[index][0] for index in range(len(graph_points))],
                     [graph_points[index][1] for index in range(len(graph_points))])
             points = [(switch_point_to_graph((x, 0))[0], curve_func(switch_point_to_graph((x, 0))[0]))
-                      for x in np.linspace(GRAPH_WIDTH_LOWER, GRAPH_WIDTH_UPPER, 22000)]
+                      for x in np.linspace(GRAPH_WIDTH_LOWER, GRAPH_WIDTH_UPPER, SAMPLE_RATE)]
             # Reset the sound
             sound.stop()
             sound = audio.audio_from_function(curve_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
@@ -276,8 +344,8 @@ while running:
             # Switch the curve points from graph points to gui points
             curve_points_gui = [switch_to_gui(point) for point in points]
             output_line = curve_points_gui
-            print(points[:10])
-            print(curve_points_gui[:10])
+            print(f"Points: {points[:10]}")
+            print(f"Curve points gui: {curve_points_gui[:10]}")
             print(f"Curve points gui len: {len(curve_points_gui)}")
         output_line = curve_points_gui
         # Scale mode
@@ -292,23 +360,63 @@ while running:
             output_line = [
                 (x, GRAPH_HEIGHT_LOWER + ratio * (y - min_val)) for (x, y)
                 in output_line]
-            graph_points = [switch_point_to_graph(point) for point in line_points]
         pygame.draw.aalines(screen, LINE_COLOR, False, output_line, LINE_THICKNESS)
     else:
         # Draw the line
         for index in range(len(line_points) - 1):
             pygame.draw.aaline(screen, LINE_COLOR, line_points[index], line_points[index + 1], LINE_THICKNESS)
+
+    # Prepare Fourier
+    if fourier_button.get_state() > 0 and (is_moving_line or change_curve):
+        print("Getting fourier approximation")
+        if curve_button.get_state() > 0:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                graph_fourier_points = list(executor.map(lambda x: (x, fourier_func(x)), range(switch_point_to_graph((GRAPH_WIDTH_LOWER, 0))[0],
+                                                         switch_point_to_graph((GRAPH_WIDTH_UPPER, 0))[0])))
+
+        else:
+            graph_fourier_points = [switch_point_to_graph((x, fourier_func(x))) for x in range(GRAPH_WIDTH_LOWER, GRAPH_WIDTH_UPPER)]
+
+        if scale_button.get_state() == 1:
+            max_val = max(graph_fourier_points, key=lambda coord: coord[1])[1]
+            min_val = min(graph_fourier_points, key=lambda coord: coord[1])[1]
+            scale = 1
+            half_height = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / 2 + GRAPH_HEIGHT_LOWER
+            ratio = 1
+            if (max_val - min_val) > 0:
+                ratio = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / (max_val - min_val)
+            graph_fourier_points = [
+                (x, GRAPH_HEIGHT_LOWER + ratio * (y - min_val)) for (x, y)
+                in graph_fourier_points]
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            fourier_points_gui = list(
+                executor.map(lambda point: (switch_to_gui_fourier(point)), iter(graph_fourier_points)))
+        fourier_sound = audio.audio_from_function(fourier_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
+                                          - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
+        print(f"Graph fourier points: {graph_fourier_points[:10]}")
+        print(f"Gui fourier points: {fourier_points_gui[-20:]}")
+        print("Drawing the fourier approximation")
+
+    # Draw the fourier approximation
+    if fourier_button.get_state() > 0 and len(fourier_points_gui) > 2:
+        pygame.draw.aalines(screen, FOURIER_COLOR, False, fourier_points_gui, LINE_THICKNESS)
+
     # Draw the points pressed:
     for point in line_points:
         pygame.draw.circle(screen, POINT_COLOR, point, 5)
-
     # Draw the UI:
     curve_button.draw()
     debug_button.draw()
     scale_button.draw()
+    fourier_button.draw()
 
     # Render the cursor position
     screen.blit(position_text, (GRAPH_WIDTH_LOWER, HEIGHT - 40))
+
+    # Render the help text
+    font = pygame.font.Font(None, 20)
+    help_text = font.render("Press \"P\" to play sound", True, (0, 100, 0))
+    screen.blit(help_text, (GRAPH_WIDTH_LOWER, HEIGHT - 80))
 
     # Update the display
     pygame.display.flip()

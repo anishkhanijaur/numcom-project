@@ -1,6 +1,6 @@
 import numpy as np
 import scipy
-import matplotlib.pyplot as plt
+import concurrent.futures
 
 
 def integrate_complex_function(f, a, b):
@@ -44,20 +44,6 @@ def produce_fourier_func(f, n_coefficient, period):
 
     return fourier_func
 
-
-def f(x):
-    return x ** 2 + x ** 9 + 3
-
-
-# period = 10
-# fourier = produce_fourier_func(f, 50, period)
-# xs = np.linspace(0, period, 1000)
-# ys = [f(x) for x in xs]
-# ys1 = [fourier(x) for x in xs]
-# plt.plot(xs, ys)
-# plt.plot(xs, ys1)
-
-
 def fourier_approximation(func, x_values, num_terms):
     T = x_values[-1] - x_values[0]
     a0 = (1/T) * np.trapz([func(x) for x in x_values], x=x_values)
@@ -70,11 +56,19 @@ def fourier_approximation(func, x_values, num_terms):
         integrand = lambda x: func(x) * np.sin(2 * np.pi * n * x / T)
         return (2/T) * np.trapz([integrand(x) for x in x_values], x=x_values)
 
+    def sum_coefficients(input, x):
+        a_n_result, b_n_result, n = input
+        return a_n_result * np.cos(2 * np.pi * n * x / T) + b_n_result * np.sin(2 * np.pi * n * x / T)
+
     def fourier_series(x):
-        series_sum = a0/2
-        for n in range(1, num_terms + 1):
-            series_sum += a_n(n) * np.cos(2 * np.pi * n * x / T) + b_n(n) * np.sin(2 * np.pi * n * x / T)
-        return series_sum+1
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            # Use list comprehension to submit tasks and gather results
+            results = list(executor.map(lambda n: (a_n(n), b_n(n), n), range(1, num_terms + 1)))
+
+        results_list = []
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            results_list = list(executor.map(lambda index: sum_coefficients(results[index], x), range(len(results))))
+        return sum(results_list) + 1 + a0 / 2
 
     return fourier_series
 
