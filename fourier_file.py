@@ -44,9 +44,46 @@ def produce_fourier_func(f, n_coefficient, period):
 
     return fourier_func
 
+# def fourier_approximation(func, x_values, num_terms):
+#     T = x_values[-1] - x_values[0]
+#     a0 = (1/T) * np.trapz([func(x) for x in x_values], x=x_values)
+#
+#     def a_n(n):
+#         integrand = lambda x: func(x) * np.cos(2 * np.pi * n * x / T)
+#         return (2/T) * np.trapz([integrand(x) for x in x_values], x=x_values)
+#
+#     def b_n(n):
+#         integrand = lambda x: func(x) * np.sin(2 * np.pi * n * x / T)
+#         return (2/T) * np.trapz([integrand(x) for x in x_values], x=x_values)
+#
+#     def sum_coefficients(input, x):
+#         a_n_result, b_n_result, n = input
+#         return a_n_result * np.cos(2 * np.pi * n * x / T) + b_n_result * np.sin(2 * np.pi * n * x / T)
+#
+#     def fourier_series(x):
+#         results = []
+#         with concurrent.futures.ThreadPoolExecutor() as executor:
+#             # Use list comprehension to submit tasks and gather results
+#             results = list(executor.map(lambda n: (a_n(n), b_n(n), n), range(1, num_terms + 1)))
+#
+#         results_list = []
+#         with concurrent.futures.ThreadPoolExecutor() as executor:
+#             results_list = list(executor.map(lambda index: sum_coefficients(results[index], x), range(len(results))))
+#         return sum(results_list) + 1 + a0 / 2
+#
+#     return fourier_series
+
 def fourier_approximation(func, x_values, num_terms):
     T = x_values[-1] - x_values[0]
     a0 = (1/T) * np.trapz([func(x) for x in x_values], x=x_values)
+
+    # def a_n(n):
+    #     integrand = func(x_values) * np.cos(2 * np.pi * n * x_values / T)
+    #     return (2/T) * np.trapz(integrand, x=x_values)
+    #
+    # def b_n(n):
+    #     integrand = func(x_values) * np.sin(2 * np.pi * n * x_values / T)
+    #     return (2/T) * np.trapz(integrand, x=x_values)
 
     def a_n(n):
         integrand = lambda x: func(x) * np.cos(2 * np.pi * n * x / T)
@@ -56,19 +93,15 @@ def fourier_approximation(func, x_values, num_terms):
         integrand = lambda x: func(x) * np.sin(2 * np.pi * n * x / T)
         return (2/T) * np.trapz([integrand(x) for x in x_values], x=x_values)
 
-    def sum_coefficients(input, x):
-        a_n_result, b_n_result, n = input
-        return a_n_result * np.cos(2 * np.pi * n * x / T) + b_n_result * np.sin(2 * np.pi * n * x / T)
+    a_values = [a_n(n) for n in range(1, num_terms + 1)]
+    b_values = [b_n(n) for n in range(1, num_terms + 1)]
 
     def fourier_series(x):
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            # Use list comprehension to submit tasks and gather results
-            results = list(executor.map(lambda n: (a_n(n), b_n(n), n), range(1, num_terms + 1)))
-
-        results_list = []
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            results_list = list(executor.map(lambda index: sum_coefficients(results[index], x), range(len(results))))
-        return sum(results_list) + 1 + a0 / 2
+        cos_terms = np.cos(2 * np.pi * np.arange(1, num_terms + 1) * x / T)
+        sin_terms = np.sin(2 * np.pi * np.arange(1, num_terms + 1) * x / T)
+        # Matrix multiplication
+        result = a_values @ cos_terms + b_values @ sin_terms
+        return result + 1 + a0 / 2
 
     return fourier_series
 
