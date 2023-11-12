@@ -8,10 +8,7 @@ import numpy as np
 import concurrent.futures
 
 '''
-    TODO: . Figure out how to compile this code to become like an exe file.
-          . How to save the produced sound.
-          . H to show the help menu
-          . https://en.wikipedia.org/wiki/Constrained_optimization
+    TODO: . https://en.wikipedia.org/wiki/Constrained_optimization
 '''
 def main_loop():
 
@@ -93,12 +90,6 @@ def main_loop():
         y = (HEIGHT / 2 - y * 240)
         return (x, y)
 
-    def switch_to_gui_fourier(point: (int, int)) -> (int, int):
-        x, y = point
-        x = (x / 24 + GRAPH_WIDTH_LOWER)
-        y = (HEIGHT / 2 - y * 240)+local_height
-        return (x, y)
-
 
     # Line properties
     line_start = [GRAPH_WIDTH_LOWER, int(HEIGHT / 2)]
@@ -110,17 +101,6 @@ def main_loop():
     fourier_points_gui = []
 
     # Returns the y value of the line at the x position
-    # def line_func(x):
-    #     for index in range(len(line_points) - 1):
-    #         if line_points[index][0] < x < line_points[index + 1][0]:
-    #             x1, y1 = line_points[index]
-    #             x2, y2 = line_points[index + 1]
-    #             # calculate y = mx + c
-    #             m = (y2 - y1) / (x2 - x1)
-    #             c = y2 - m * x2
-    #             return m * x + c
-    #     return 0
-
     def line_func(x):
         if isinstance(x, list):  # Check if x is a list
             return [line_func(xi) for xi in x]
@@ -156,7 +136,17 @@ def main_loop():
     scale_button = Button(["Scale", "Scaling"], button_y)
     button_y += 60
     fourier_button = Button(["Fourier"] + [str(3*i) for i in range(1,10)], button_y)
+    button_y += 60
+    distance_button = Button(["Fourier Close", "Fourier Far"], button_y)
 
+    def switch_to_gui_fourier(point: (int, int)) -> (int, int):
+        x, y = point
+        x = (x / 24 + GRAPH_WIDTH_LOWER)
+        if distance_button.get_state() == 0:
+            y = (HEIGHT / 2 - y * 240)+local_height-32
+        else:
+            y = (HEIGHT / 2 - y * 240)+local_height
+        return (x, y)
 
     # Checks if the cursor close enough to the line
     def touching_line(position):
@@ -208,6 +198,7 @@ def main_loop():
                     scale_button.is_colliding(event.pos)
                     fourier_state = fourier_button.get_state()
                     fourier_button.is_colliding(event.pos)
+                    distance_button.is_colliding(event.pos)
                     if fourier_button.get_state() > 0 and fourier_button.get_state() != fourier_state:
                         # Update fourier
                         if curve_button.get_state() > 0:
@@ -395,6 +386,7 @@ def main_loop():
         debug_button.draw()
         scale_button.draw()
         fourier_button.draw()
+        distance_button.draw()
 
         # Render the cursor position
         screen.blit(position_text, (GRAPH_WIDTH_LOWER, HEIGHT - 40))
