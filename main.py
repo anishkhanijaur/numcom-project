@@ -126,7 +126,6 @@ def main_loop():
     fourier_sound = sound
     fourier_func = fourier_file.fourier_approximation(line_func, [point[0] for point in line_points], 0)
 
-
     # UI Buttons
     button_y = 10
     curve_button = Button(["Line", "Lagrange", "Spline"], button_y)
@@ -199,7 +198,7 @@ def main_loop():
                     fourier_state = fourier_button.get_state()
                     fourier_button.is_colliding(event.pos)
                     distance_button.is_colliding(event.pos)
-                    if fourier_button.get_state() > 0 and fourier_button.get_state() != fourier_state:
+                    if fourier_button.get_state() > 0 and (fourier_button.get_state() != fourier_state or change_curve):
                         # Update fourier
                         if curve_button.get_state() > 0:
                             fourier_func = fourier_file.fourier_approximation(
@@ -352,6 +351,11 @@ def main_loop():
         # Prepare Fourier
         if fourier_button.get_state() > 0 and (is_moving_line or change_curve):
             if curve_button.get_state() > 0:
+                fourier_func = fourier_file.fourier_approximation(
+                    curve_func,
+                    np.linspace(0, switch_point_to_graph((GRAPH_WIDTH_UPPER, 0))[0], 10),
+                    fourier_button.get_state() * 3
+                )
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     graph_fourier_points = list(executor.map(lambda x: (x, fourier_func(x)), range(switch_point_to_graph((GRAPH_WIDTH_LOWER, 0))[0],
                                                              switch_point_to_graph((GRAPH_WIDTH_UPPER, 0))[0])))
