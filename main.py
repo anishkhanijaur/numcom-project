@@ -37,6 +37,7 @@ def main_loop():
     local_height = (GRAPH_HEIGHT_UPPER - GRAPH_HEIGHT_LOWER) / 2
     SAMPLE_RATE = 20000
     DURATION = 1
+    FOURIER_SAMPLES = 10
 
     # Screen setup
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
@@ -120,7 +121,6 @@ def main_loop():
     is_moving_line = False
     play_sound = False
     play_fourier_sound = False
-    interpolation_methods = 2
     sound = audio.audio_from_function(line_func, switch_point_to_graph((GRAPH_WIDTH_UPPER, local_height))[0]
                                       - switch_point_to_graph((GRAPH_WIDTH_LOWER, local_height))[0])
     fourier_sound = sound
@@ -133,8 +133,9 @@ def main_loop():
     debug_button = Button(["Debug", "Debugging"], button_y)
     button_y += 60
     scale_button = Button(["Scale", "Scaling"], button_y)
+    sample_button = Button(["Samples: 10"] + [f"Samples: {str(10+3*i)}" for i in range(1,10)], button_y)
     button_y += 60
-    fourier_button = Button(["Fourier"] + [str(3*i) for i in range(1,10)], button_y)
+    fourier_button = Button(["Fourier"] + [f"Fourier: {str(3*i)}" for i in range(1,10)], button_y)
     button_y += 60
     distance_button = Button(["Fourier Close", "Fourier Far"], button_y)
 
@@ -194,20 +195,22 @@ def main_loop():
                     if curve_button.is_colliding(event.pos):
                         change_curve = True
                     debug_button.is_colliding(event.pos)
-                    scale_button.is_colliding(event.pos)
+                    # scale_button.is_colliding(event.pos)
+                    sample_button.is_colliding(event.pos)
                     fourier_state = fourier_button.get_state()
                     fourier_button.is_colliding(event.pos)
                     distance_button.is_colliding(event.pos)
+                    FOURIER_SAMPLES = sample_button.get_state()*3 + 10
                     if fourier_button.get_state() > 0 and (fourier_button.get_state() != fourier_state or change_curve):
                         # Update fourier
                         if curve_button.get_state() > 0:
                             fourier_func = fourier_file.fourier_approximation(
                                 curve_func,
-                                np.linspace(0, switch_point_to_graph((GRAPH_WIDTH_UPPER, 0))[0], 10),
+                                np.linspace(0, switch_point_to_graph((GRAPH_WIDTH_UPPER, 0))[0], FOURIER_SAMPLES),
                                 fourier_button.get_state()*3
                             )
                         else:
-                            all_points = line_points + [(point, 0) for point in np.linspace(GRAPH_WIDTH_LOWER, GRAPH_HEIGHT_UPPER, len(line_points)*10)]
+                            all_points = line_points + [(point, 0) for point in np.linspace(GRAPH_WIDTH_LOWER, GRAPH_HEIGHT_UPPER, FOURIER_SAMPLES)]
                             points = [point[0] for point in all_points]
                             points.sort(reverse=False)
                             fourier_func = fourier_file.fourier_approximation(
@@ -243,10 +246,10 @@ def main_loop():
                 # Reset all points when backspace pressed
                 if event.key == pygame.K_BACKSPACE:
                     line_points = [line_start, line_end]
-                    curve_points = [switch_point_to_graph(line_start), switch_point_to_graph(line_end)]
                     curve_points_gui = [line_start, line_end]
                     curve_func = line_func
                     fourier_button.reset_state()
+                    sample_button.reset_state()
                     sound.stop()
                     play_sound = False
                     play_fourier_sound = False
@@ -353,7 +356,7 @@ def main_loop():
             if curve_button.get_state() > 0:
                 fourier_func = fourier_file.fourier_approximation(
                     curve_func,
-                    np.linspace(0, switch_point_to_graph((GRAPH_WIDTH_UPPER, 0))[0], 10),
+                    np.linspace(0, switch_point_to_graph((GRAPH_WIDTH_UPPER, 0))[0], FOURIER_SAMPLES),
                     fourier_button.get_state() * 3
                 )
                 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -388,7 +391,8 @@ def main_loop():
         # Draw the UI:
         curve_button.draw()
         debug_button.draw()
-        scale_button.draw()
+        # scale_button.draw()
+        sample_button.draw()
         fourier_button.draw()
         distance_button.draw()
 
